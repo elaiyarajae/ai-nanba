@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+langchain-huggingface
+langgraph
+qdrant-client
+httpx
+python-dotenv
+pydantic
+sentence-transformers
+fastapi-users[sqlalchemy]>=12.1.2
+fastapi-jwt-auth
+python-multipart
+python-docx
+pypdf
+beautifulsoup4 
