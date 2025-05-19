@@ -8,15 +8,15 @@ class RAGAgent:
         self.embedding_service = EmbeddingService()
         self.llm_client = LLMClient()
 
-    async def answer_question(self, customer_id: str, question: str, top_k: int = 5) -> str:
+    async def answer_question(self, collection_name: str, question: str, top_k: int = 5) -> str:
         # Embed the question
         question_vec = self.embedding_service.embed_texts([question])[0]
         # Query Qdrant for top-K relevant chunks
-        results = self.vector_store.query(collection_name=customer_id, query_vector=question_vec, top_k=top_k)
+        results = self.vector_store.query(collection_name=collection_name, query_vector=question_vec, top_k=top_k)
         # Combine retrieved chunks as context
         context = "\n".join([hit.payload.get("text", "") for hit in results])
         # Create prompt
         prompt = f"Context:\n{context}\n\nQuestion: {question}\nAnswer:"
         # Call LLM
         answer = await self.llm_client.generate(prompt)
-        return answer 
+        return answer

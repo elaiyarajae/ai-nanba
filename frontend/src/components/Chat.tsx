@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Box, TextField, Button, Typography, Paper, Stack, Alert } from '@mui/material';
+import React, { useState, useEffect, useRef } from 'react';
+import { Box, TextField, Button, Typography, Paper, Stack, Alert, Select, MenuItem } from '@mui/material';
+import { Product } from './Products'; 
 
 interface Message {
   role: 'user' | 'agent';
@@ -11,14 +12,73 @@ interface ChatProps {
 }
 
 const Chat: React.FC<ChatProps> = ({ token }) => {
-  const [customerId, setCustomerId] = useState('');
+  const [productId, setProductId] = useState(''); 
+  const [products, setProducts] = useState<Product[]>([]);
+  const [username, setUsername] = useState('');
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('/products', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!response.ok) throw new Error('Failed to fetch products');
+        const data = await response.json();
+        setProducts(data.products);
+      } catch (err) {
+        console.error('Failed to fetch products');
+      }
+    };
+    fetchProducts();
+  }, [token]);
+
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const scrollToBottom = () => {
+    if (messagesContainerRef.current) {
+      const scrollHeight = messagesContainerRef.current.scrollHeight;
+      const height = messagesContainerRef.current.clientHeight;
+      const maxScrollTop = scrollHeight - height;
+      messagesContainerRef.current.scrollTo({
+        top: maxScrollTop,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const scrollToNewMessage = () => {
+    if (messagesContainerRef.current) {
+      const lastMessage = messagesContainerRef.current.lastElementChild?.lastElementChild;
+      if (lastMessage) {
+        const containerTop = messagesContainerRef.current.getBoundingClientRect().top;
+        const messageTop = lastMessage.getBoundingClientRect().top;
+        const offset = messageTop - containerTop - 20; // 20px padding from top
+        
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollTop + offset,
+          behavior: 'smooth'
+        });
+      }
+    }
+  };
+
+  useEffect(() => {
+    // Small delay to ensure DOM is updated
+    setTimeout(scrollToNewMessage, 100);
+  }, [messages, loading]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
+
   const handleSend = async () => {
-    if (!customerId || !question) return;
+    if (!productId || !question) return;
     setMessages((msgs) => [...msgs, { role: 'user', text: question }]);
     setLoading(true);
     setError('');
@@ -29,7 +89,7 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ customer_id: customerId, question }),
+        body: JSON.stringify({ product_id: productId, question }),
       });
       if (!res.ok) throw new Error('API error');
       const data = await res.json();
@@ -48,205 +108,293 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
       display: 'flex', 
       flexDirection: 'column',
       width: '100%',
-      position: 'relative'
+      position: 'relative',
     }}>
-      <Stack spacing={2} mb={2} direction="row">
-        <TextField 
-          label="Customer ID" 
-          value={customerId} 
-          onChange={e => setCustomerId(e.target.value)} 
-          size="small"
-          sx={{
-            maxWidth: '200px',
-            '& .MuiOutlinedInput-root': {
-              backgroundColor: '#FFFFFF',
-              borderRadius: '8px',
-              '& fieldset': {
-                borderColor: '#C9D6DF'
-              },
-              '&:hover fieldset': {
-                borderColor: '#788189'
-              },
-              '&.Mui-focused fieldset': {
-                borderColor: '#52616B'
-              }
-            },
-            '& .MuiInputLabel-root': {
-              color: '#52616B',
-              fontFamily: 'Nunito, sans-serif',
-              fontSize: '1rem',
-              '&.Mui-focused': {
-                color: '#1E2022'
-              }
-            },
-            '& .MuiOutlinedInput-input': {
-              color: '#1E2022',
-              fontFamily: 'Nunito, sans-serif',
-              fontSize: '1rem'
-            }
-          }}
-        />
-      </Stack>
-      {error && <Alert severity="error">{error}</Alert>}
-      <Paper 
-        variant="outlined" 
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Box 
+        ref={messagesContainerRef}
         sx={{ 
           flexGrow: 1,
-          mb: 2, 
-          p: 3,
           overflowY: 'auto',
-          backgroundColor: '#ffffff',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          width: '100%'
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          pb: '100px',
+          scrollBehavior: 'smooth'
         }}
       >
         {messages.length === 0 && (
-          <Typography 
-            color="text.secondary"
-            sx={{ 
-              textAlign: 'center',
-              fontFamily: 'Nunito, sans-serif',
-              fontSize: '1.1rem',
-              color: '#6B7280'  // Matching the placeholder color
-            }}
-          >
-            Start a conversation by asking a question.
-          </Typography>
-        )}
-        {messages.map((msg, i) => (
-          <Box 
-            key={i} 
-            sx={{ 
-              mb: 2,
-              p: 2,
-              backgroundColor: msg.role === 'user' ? '#f0f7ff' : '#ffffff',
-              borderRadius: '8px',
-              maxWidth: '80%',
-              ml: msg.role === 'user' ? 'auto' : 0,
-              border: '1px solid',
-              borderColor: msg.role === 'user' ? '#e3f2fd' : '#f0f2f5',
-            }}
-          >
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            gap: 2,
+            py: 8
+          }}>
             <Typography 
-              variant="subtitle2" 
-              sx={{
-                color: msg.role === 'user' ? '#1976d2' : '#333333',
+              variant="h4"
+              sx={{ 
                 fontFamily: 'Nunito, sans-serif',
-                fontWeight: 600,
-                mb: 1
+                fontWeight: 700,
+                color: '#1E2022'
               }}
             >
-              {msg.role === 'user' ? 'You' : 'AI Nanba'}
+              AI Nanba
             </Typography>
-            <Typography sx={{ 
-              color: '#1e1e1e',
-              fontFamily: 'Nunito, sans-serif',
-              lineHeight: 1.6
-            }}>
-              {msg.text}
+            <Typography 
+              color="text.secondary"
+              sx={{ 
+                textAlign: 'center',
+                fontFamily: 'Nunito, sans-serif',
+                fontSize: '1.1rem',
+                color: '#6B7280'
+              }}
+            >
+              Your intelligent AI assistant. Select a product and start asking questions.
             </Typography>
           </Box>
-        ))}
-      </Paper>
+        )}
+        <Box sx={{ maxWidth: '64rem', width: '100%', margin: '0 auto', px: 2 }}>
+          {messages.map((msg, i) => (
+            <Box 
+              key={i} 
+              sx={{ 
+                display: 'flex',
+                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                mb: 2,
+                px: 2
+              }}
+            >
+              <Box
+                sx={{
+                  maxWidth: '85%',
+                  backgroundColor: msg.role === 'user' ? '#34373b' : '#ffffff',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  position: 'relative',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                }}
+              >
+                <Typography 
+                  variant="subtitle2" 
+                  sx={{
+                    color: msg.role === 'user' ? '#ffffff' : '#1a73e8',
+                    fontFamily: 'Nunito, sans-serif',
+                    fontWeight: 600,
+                    mb: 0.5
+                  }}
+                >
+                  {msg.role === 'user' ? username : 'AI Nanba'}
+                </Typography>
+                <Typography sx={{ 
+                  color: msg.role === 'user' ? '#ffffff' : '#202124',
+                  fontFamily: 'Nunito, sans-serif',
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {msg.text}
+                </Typography>
+              </Box>
+            </Box>
+          ))}
+          {loading && (
+            <Box 
+              sx={{ 
+                display: 'flex',
+                justifyContent: 'flex-start',
+                mb: 2,
+                px: 2
+              }}
+            >
+              <Box
+                sx={{
+                  maxWidth: '85%',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  position: 'relative',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                }}
+              >
+                <Typography 
+                  variant="subtitle2" 
+                  sx={{
+                    color: '#1a73e8',
+                    fontFamily: 'Nunito, sans-serif',
+                    fontWeight: 600,
+                    mb: 0.5
+                  }}
+                >
+                  AI Nanba
+                </Typography>
+                <Typography sx={{ 
+                  color: '#202124',
+                  fontFamily: 'Nunito, sans-serif',
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}>
+                  Thinking
+                  <Box 
+                    component="span" 
+                    sx={{ 
+                      display: 'inline-flex',
+                      fontSize: '24px', 
+                      lineHeight: '16px', 
+                      marginTop: '-4px', 
+                      '@keyframes dots': {
+                        '0%, 20%': { content: '"."' },
+                        '40%': { content: '".."' },
+                        '60%, 100%': { content: '"..."' }
+                      },
+                      '&::after': {
+                        content: '"."',
+                        animation: 'dots 1.5s infinite'
+                      }
+                    }}
+                  />
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </Box>
       <Box 
         sx={{
-          position: 'sticky',
+          position: 'relative',
           bottom: 0,
           left: 0,
           right: 0,
-          padding: '16px 0',
-          backgroundColor: '#F0F5F9',
-          borderTop: '1px solid #e5e5e5',
-          width: '100%'
+          padding: '1rem',
+          background: 'linear-gradient(180deg, rgba(240,242,245,0) 0%, #f0f2f5 50%)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          transition: 'left 0.3s ease',
+          zIndex: 1000,
+          '@media (min-width: 600px)': {
+            left: 0
+          }
         }}
       >
-        <Stack 
-          direction="row" 
-          spacing={2}
+        <Box
           sx={{
-            backgroundColor: '#ffffff',
-            p: '8px 16px',
-            borderRadius: '12px',
-            border: '1px solid #e5e5e5',
+            maxWidth: '64rem',
             width: '100%',
-            maxWidth: '100%',
-            margin: '0 auto',
-            alignItems: 'flex-end'
+            position: 'relative'
           }}
         >
-          <TextField
-            placeholder="Ask Anything"
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
-            fullWidth
-            multiline
-            maxRows={4}
-            disabled={loading}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
+          <Stack 
+            direction="row" 
+            spacing={1}
+            alignItems="center"
             sx={{
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: '#ffffff',
-                '& fieldset': {
-                  borderColor: 'transparent'
-                },
-                '&:hover fieldset': {
-                  borderColor: 'transparent'
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: 'transparent'
-                }
-              },
-              '& .MuiOutlinedInput-input': {
-                color: '#1E2022',
-                lineHeight: '1.5',
-                minHeight: '24px',
-                fontFamily: 'Nunito, sans-serif',
-                fontSize: '1.1rem',
-                '&::placeholder': {
-                  color: '#6B7280',
-                  opacity: 1,
-                  fontFamily: 'Nunito, sans-serif',
-                  fontSize: '1.1rem'
-                }
-              }
-            }}
-          />
-          <Button 
-            variant="contained" 
-            onClick={handleSend} 
-            disabled={loading || !question || !customerId}
-            sx={{
-              backgroundColor: '#1E2022',
-              color: '#F0F5F9',
-              minWidth: '40px',
-              width: '40px',
-              height: '40px',
-              padding: 0,
-              borderRadius: '8px',
-              flexShrink: 0,
-              marginBottom: '5px',
-              '&:hover': {
-                backgroundColor: '#34373b'
-              },
-              '&.Mui-disabled': {
-                backgroundColor: '#C9D6DF',
-                color: '#788189',
-                marginBottom: '5px',
-              }
+              backgroundColor: '#ffffff',
+              p: '8px 12px',
+              borderRadius: '24px',
+              border: '1px solid #e5e5e5',
+              width: '100%',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </Button>
-        </Stack>
+            <Select
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              displayEmpty
+              size="small"
+              sx={{
+                minWidth: 150,
+                '& .MuiOutlinedInput-notchedOutline': {
+                  fontFamily: 'Nunito, sans-serif',
+                  fontSize: '0.9rem',
+                  border: 'none'
+                },
+                '& .MuiSelect-select': {
+                  fontFamily: 'Nunito, sans-serif',
+                  fontSize: '0.9rem',
+                  py: 1,
+                  pr: 3
+                }
+              }}
+            >
+              <MenuItem value="" sx={{ fontFamily: 'Nunito, sans-serif'}} disabled>Select Product</MenuItem>
+              {products.map((product) => (
+                <MenuItem 
+                  key={product.id} 
+                  value={product.id}
+                  sx={{ fontFamily: 'Nunito, sans-serif' }}
+                >
+                  {product.name}
+                </MenuItem>
+              ))}
+            </Select>
+            <TextField
+              placeholder="Ask anything..."
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              fullWidth
+              multiline
+              maxRows={4}
+              disabled={loading}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'transparent',
+                  '& fieldset': {
+                    border: 'none'
+                  }
+                },
+                '& .MuiOutlinedInput-input': {
+                  color: '#202124',
+                  lineHeight: '1.5',
+                  minHeight: '24px',
+                  fontFamily: 'Nunito, sans-serif',
+                  fontSize: '1rem',
+                  padding: '8px 0',
+                  '&::placeholder': {
+                    color: '#5f6368',
+                    opacity: 1
+                  }
+                }
+              }}
+            />
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Button 
+                variant="contained" 
+                onClick={handleSend} 
+                disabled={loading || !question || !productId}
+                sx={{
+                  minWidth: '40px',
+                  width: '40px',
+                  height: '40px',
+                  padding: 0,
+                  borderRadius: '50%',
+                  backgroundColor: '#202124',
+                  '&:hover': {
+                    backgroundColor: '#3c4043'
+                  },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Button>
+            </Box>
+          </Stack>
+        </Box>
       </Box>
     </Box>
   );

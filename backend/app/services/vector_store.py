@@ -22,4 +22,4 @@ class VectorStore:
 
     def query(self, collection_name: str, query_vector: List[float], top_k: int = 5):
         results = self.client.search(collection_name=collection_name, query_vector=query_vector, limit=top_k)
-        return results 
+        return results
