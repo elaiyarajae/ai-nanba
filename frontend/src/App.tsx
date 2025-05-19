@@ -1,13 +1,38 @@
-import React, { useState } from 'react';
-import { AppBar, Toolbar, Typography, Box, Container, IconButton } from '@mui/material';
-import { Logout as LogoutIcon, ChevronLeft, ChevronRight } from '@mui/icons-material';
+import React, { useState, useEffect } from 'react';
+import { AppBar, Toolbar, Typography, Box, IconButton } from '@mui/material';
+import { Logout as LogoutIcon } from '@mui/icons-material';
 import Chat from './components/Chat.tsx';
 import Upload from './components/Upload.tsx';
 import Login from './components/Login.tsx';
+import Sidebar from './components/Sidebar.tsx';
+import Products from './components/Products.tsx';  // Rename import but keep file name for now
 
 function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('jwt_token'));
-  const [isUploadVisible, setIsUploadVisible] = useState(true);
+  const [currentRoute, setCurrentRoute] = useState('chat');
+  const [username, setUsername] = useState('');
+
+  useEffect(() => {
+    if (token) {
+      const parseJwt = (token: string) => {
+        try {
+          return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+          return null;
+        }
+      };
+      const formatToCamelCase = (name: string) => {
+        return name
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join('');
+      };
+      const tokenData = parseJwt(token);
+      if (tokenData && tokenData.identity) {
+        setUsername(formatToCamelCase(tokenData.identity));
+      }
+    }
+  }, [token]);
 
   const handleLogin = (jwt: string) => {
     setToken(jwt);
@@ -43,49 +68,46 @@ function App() {
           }}>
             AI Nanba
           </Typography>
-          <IconButton 
-            color="inherit" 
-            onClick={handleLogout} 
-            aria-label="logout"
-            sx={{ color: '#1E2022' }}
-          >
-            <LogoutIcon />
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography sx={{ 
+              fontFamily: 'Nunito, sans-serif',
+              color: '#1E2022',
+              fontWeight: 600
+            }}>
+              {username || 'User'}
+            </Typography>
+            <IconButton 
+              onClick={handleLogout}
+              sx={{ 
+                color: '#1E2022',
+                '&:hover': {
+                  backgroundColor: 'rgba(30, 32, 34, 0.04)'
+                }
+              }}
+            >
+              <LogoutIcon />
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
       <Box sx={{ 
         display: 'flex', 
         flexGrow: 1, 
-        position: 'relative',
-        '@media (max-width: 900px)': {
-          flexDirection: 'column'
-        }
+        position: 'relative'
       }}>
-        {/* Fixed Sidebar */}
-        <Box sx={{ 
-          width: '320px',
-          backgroundColor: '#FFFFFF',
-          borderRight: '1px solid #C9D6DF',
-          height: 'calc(100vh - 64px)', // Subtract AppBar height
-          overflow: 'auto',
-          '@media (max-width: 900px)': {
-            width: '100%',
-            height: 'auto',
-            borderRight: 'none',
-            borderBottom: '1px solid #C9D6DF'
-          }
-        }}>
-          <Upload token={token} />
-        </Box>
-
-        {/* Main Chat Area */}
+        <Sidebar 
+          onNavigate={setCurrentRoute}
+          currentRoute={currentRoute}
+        />
         <Box sx={{ 
           flex: 1,
           minWidth: 0,
           p: 3,
           backgroundColor: '#F0F5F9'
         }}>
-          <Chat token={token} />
+          {currentRoute === 'chat' && <Chat token={token} />}
+          {currentRoute === 'upload' && <Upload token={token} />}
+          {currentRoute === 'settings' && <Products token={token} />}
         </Box>
       </Box>
     </Box>
